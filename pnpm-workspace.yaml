@@ -1,0 +1,12 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+allowBuilds:
+  esbuild: true
+  isolated-vm: true
+
+patchedDependencies:
+  vite-plugin-monaco-editor@1.1.0: patches/vite-plugin-monaco-editor@1.1.0.patch
+
+autoInstallPeers: true
