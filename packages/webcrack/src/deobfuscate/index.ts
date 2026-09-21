@@ -3,7 +3,7 @@ import type { AsyncTransform } from '../ast-utils';
 import {
   applyTransform,
   applyTransformAsync,
-  applyTransforms,
+  applyTransformsUntilFixedPoint,
 } from '../ast-utils';
 import mergeStrings from '../unminify/transforms/merge-strings';
 import { findArrayRotator } from './array-rotator';
@@ -70,7 +70,11 @@ export default {
       state.changes += 2 + decoders.length;
     }
 
-    state.changes += applyTransforms(
+    // These transforms enable each other (e.g. dead-code removal exposes new
+    // string concatenations, control-flow unflattening creates new dead
+    // branches), so they run as a fixed-point loop with an iteration cap
+    // instead of a single pass.
+    state.changes += applyTransformsUntilFixedPoint(
       ast,
       [mergeStrings, deadCode, controlFlowObject, controlFlowSwitch],
       { noScope: true },

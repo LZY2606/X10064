@@ -67,6 +67,73 @@ export function applyTransforms(
   return state;
 }
 
+export interface FixedPointState extends TransformState {
+  /**
+   * How many passes over the AST were executed,
+   * including the final pass that made no changes.
+   */
+  iterations: number;
+  /**
+   * True when a full pass made zero changes (fixed point reached),
+   * false when `maxIterations` was hit first.
+   */
+  converged: boolean;
+}
+
+/**
+ * Repeatedly applies the given transforms until a full pass makes no more
+ * changes (fixed point) or `maxIterations` is reached.
+ *
+ * Convergence is detected by a pass with zero changes, so when this returns
+ * with `converged: true` the loop is idempotent: running it again would be a
+ * no-op. When the transforms oscillate (e.g. two transforms undo each other),
+ * the loop still terminates after `maxIterations` passes and reports
+ * `converged: false` instead of looping forever.
+ */
+export function applyTransformsUntilFixedPoint(
+  ast: Node,
+  transforms: Transform[],
+  options: {
+    maxIterations?: number;
+    noScope?: boolean;
+    name?: string;
+    log?: boolean;
+  } = {},
+): FixedPointState {
+  const maxIterations = options.maxIterations ?? 10;
+  const name = options.name ?? transforms.map((t) => t.name).join(', ');
+  const log = options.log ?? true;
+  if (log)
+    logger(
+      `${name}: fixed-point loop started (max ${maxIterations} iterations)`,
+    );
+
+  const state: FixedPointState = {
+    changes: 0,
+    iterations: 0,
+    converged: false,
+  };
+  for (let iteration = 1; iteration <= maxIterations; iteration++) {
+    const pass = applyTransforms(ast, transforms, {
+      noScope: options.noScope,
+      name,
+      log,
+    });
+    state.changes += pass.changes;
+    state.iterations = iteration;
+    if (pass.changes === 0) {
+      state.converged = true;
+      break;
+    }
+  }
+  if (!state.converged) {
+    logger(
+      `${name}: no fixed point after ${maxIterations} iterations (${state.changes} changes), giving up`,
+    );
+  }
+  return state;
+}
+
 export function mergeTransforms(options: {
   name: string;
   tags: Tag[];

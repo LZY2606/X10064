@@ -19,19 +19,25 @@ async function importIsolatedVM(): Promise<typeof IsolatedVM> {
   return ivm;
 }
 
-export function createNodeSandbox(): Sandbox {
+export function createNodeSandbox(options?: { timeout?: number }): Sandbox {
+  const timeout = options?.timeout ?? 10_000;
   return async (code: string) => {
     const { Isolate } = await importIsolatedVM();
     const isolate = new Isolate();
-    const context = await isolate.createContext();
-    const result = (await context.eval(code, {
-      timeout: 10_000,
-      copy: true,
-      filename: 'file:///obfuscated.js',
-    })) as unknown;
-    context.release();
-    isolate.dispose();
-    return result;
+    try {
+      const context = await isolate.createContext();
+      try {
+        return (await context.eval(code, {
+          timeout,
+          copy: true,
+          filename: 'file:///obfuscated.js',
+        })) as unknown;
+      } finally {
+        context.release();
+      }
+    } finally {
+      isolate.dispose();
+    }
   };
 }
 
